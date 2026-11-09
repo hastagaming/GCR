@@ -1,0 +1,23 @@
+name: Check plugins
+
+on:
+  pull_request:
+  push:
+    branches-ignore:
+      - dist
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Static plugin check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check every plugin (build scripts are never run here)
+        run: bash ./build-plugins.sh check

@@ -1,0 +1,69 @@
+name: Build plugins
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check
+        run: bash ./build-plugins.sh check
+
+      - name: Build
+        run: bash ./build-plugins.sh build
+
+      - name: Upload the build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish the dist branch
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the trusted scripts
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Download the build output
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Verify the build output again
+        run: bash ./build-plugins.sh verify-dist
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd dist
+          git init -q -b dist
+          git config user.name "gcr-bot"
+          git config user.email "gcr-bot@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Build ${GITHUB_SHA}"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push --force origin dist
