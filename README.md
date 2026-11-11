@@ -61,28 +61,66 @@ Both keys are optional. `version` is the minimum version. Without `repo` the dep
 
 ### `main/`
 
+Everything a plugin offers lives here as YAML files. A plugin cannot run code inside the app. It extends Gitara through these declarations and through scripts that run in the Gitara Box.
+
 ```
 main/
-├── actions/<name>/action.yml     composite actions, used as  uses: plugin:<plugin-id>/<name>
-├── templates/<file>.yml          workflow templates shown in Gitara's "New workflow" list
-└── commands/<id>.yml             one-tap commands that run in the Gitara Box
+├── actions/<name>/action.yml     composite actions: uses: plugin:<plugin-id>/<name>
+├── templates/<file>.yml          workflow templates in the "New workflow" list
+├── commands/<id>.yml             commands that run in the Gitara Box
+├── hooks/<id>.yml                scripts that run on app events (the user must allow them)
+└── themes/<id>.yml               color themes for the whole app
 ```
 
-A command file:
+`assets/icon.png` (optional) is shown next to your plugin in Gitara's lists.
+
+#### Commands
 
 ```yaml
-name: Install JDK 17
-description: Installs OpenJDK 17 with apk
+name: Count lines
+description: Counts the lines of code in the repository
+places: [repo-card, repo-actions]
 shell: sh
-timeout-minutes: 30
+timeout-minutes: 10
 run: |
-  apk add --no-cache openjdk17
-  java -version
+  find . -type f -not -path './.git/*' | xargs cat | wc -l
 ```
+
+`places` says where the command appears. `plugins` (the Plugins sheet) is always included. Add `repo-card` for the menu of a repository in the repository list and `repo-actions` for the Repository actions sheet inside a repository.
+
+#### Hooks
+
+```yaml
+name: Report failed workflows
+on: workflow-finished
+shell: sh
+timeout-minutes: 5
+run: |
+  [ "$GITARA_RESULT" = "success" ] || echo "failed: $GITARA_FINISHED_WORKFLOW"
+```
+
+`on` is `repo-opened`, `after-operation` or `workflow-finished`. For `after-operation` you can add `operations: [pull, push, fetch]`. Scripts get `GITARA_EVENT`, `GITARA_RESULT` and, where it applies, `GITARA_OPERATION` and `GITARA_FINISHED_WORKFLOW`. Hooks are off until the user allows them for your plugin, and a hook run never triggers another hook.
+
+#### Themes
+
+```yaml
+name: Midnight
+light:
+  primary: "#1F6FEB"
+  background: "#FFFFFF"
+dark:
+  primary: "#58A6FF"
+  background: "#0B0F14"
+  surface: "#0B0F14"
+```
+
+Quote every color, because `#` starts a comment in YAML. Colors are `#RRGGBB` or `#AARRGGBB`. Supported keys: `primary`, `onPrimary`, `primaryContainer`, `onPrimaryContainer`, `secondary`, `onSecondary`, `background`, `onBackground`, `surface`, `onSurface`, `surfaceVariant`, `onSurfaceVariant`, `surfaceContainerLowest`, `surfaceContainerLow`, `surfaceContainer`, `surfaceContainerHigh`, `surfaceContainerHighest`, `outline`, `outlineVariant`, `error`, `onError`. Keys you leave out keep Gitara's defaults.
+
+#### Actions
 
 An action file follows the same format as repository actions in Gitara (`inputs`, `outputs`, `runs.using: composite`).
 
-Plugin actions and commands cannot read `${{ secrets.* }}`. A user has to pass a secret explicitly with `with:`.
+Plugin actions, commands and hooks cannot read `${{ secrets.* }}`. A user has to pass a secret explicitly with `with:`.
 
 ### `build.sh`
 
